@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<title>Book Reader</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'JetBrains Mono', 'D2Coding', monospace;
+    background: #1a1a1a;
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    padding: 0.75rem 1.5rem;
+    background: #0f0f0f;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  header h1 { font-size: 1rem; font-weight: 500; color: #e0e0e0; }
+  header .back { color: #888; text-decoration: none; font-size: 0.9rem; }
+  header .back:hover { color: #e0e0e0; }
+
+  #book-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    overflow: hidden;
+  }
+
+  #book { display: none; }
+  #book.ready { display: block; }
+
+  .page { background: #f8f5ee; color: #222; overflow: hidden; }
+  .page canvas { width: 100%; height: 100%; display: block; }
+  .page.hard { background: #2a2a2a; color: #e0e0e0; }
+
+  .page-cover {
+    background: #2a2a2a;
+    color: #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .page-cover h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  .page-cover p { color: #888; font-size: 0.9rem; }
+
+  #controls {
+    padding: 0.75rem 1.5rem;
+    background: #0f0f0f;
+    border-top: 1px solid #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+  }
+
+  #controls button {
+    background: #2a2a2a;
+    color: #e0e0e0;
+    border: 1px solid #444;
+    padding: 0.5rem 1rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  #controls button:hover:not(:disabled) { background: #3a3a3a; border-color: #666; }
+  #controls button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  #page-info {
+    color: #888;
+    font-size: 0.9rem;
+    min-width: 100px;
+    text-align: center;
+  }
+
+  #loading, #error { color: #888; font-size: 1rem; text-align: center; padding: 2rem; }
+  #error { color: #c88; }
+
+  @media (max-width: 768px) {
+    header h1 { font-size: 0.85rem; }
+    #controls button { padding: 0.4rem 0.7rem; font-size: 0.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html" class="back">&larr; library</a>
+  <h1 id="book-title">loading...</h1>
+  <span></span>
+</header>
+
+<div id="book-container">
+  <div id="loading">Loading book...</div>
+  <div id="error" style="display:none"></div>
+  <div id="book"></div>
+</div>
+
+<div id="controls">
+  <button id="prev">&larr; prev</button>
+  <span id="page-info">- / -</span>
+  <button id="next">next &rarr;</button>
+</div>
+
+<script src="https://unpkg.com/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+
+<script type="module">
+// Session gate: bounce to login if not unlocked
+if (!sessionStorage.getItem('room21_pw')) {
+  location.href = 'index.html';
+}
+
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+
+const params = new URLSearchParams(window.location.search);
+const bookFile = params.get('book');
+const bookTitle = params.get('title') || (bookFile ? bookFile.replace(/\.[^.]+$/, '') : 'Book');
+
+document.getElementById('book-title').textContent = bookTitle;
+document.title = bookTitle + ' - Reader';
+
+if (!bookFile) {
+  showError('No book specified.');
+  throw new Error('No book');
+}
+
+const bookPath = bookFile.startsWith('http') ? bookFile : `books/${bookFile}`;
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  const err = document.getElementById('error');
+  err.style.display = 'block';
+  err.textContent = msg;
+}
+
+function getPageSize() {
+  const container = document.getElementById('book-container');
+  const availW = container.clientWidth - 32;
+  const availH = container.clientHeight - 32;
+  const pageAspect = 3 / 4;
+  let pageH = availH;
+  let pageW = pageH * pageAspect;
+  if (pageW * 2 > availW) {
+    pageW = availW / 2;
+    pageH = pageW / pageAspect;
+  }
+  return { width: Math.floor(pageW), height: Math.floor(pageH) };
+}
+
+async function loadBook() {
+  try {
+    const pdf = await pdfjsLib.getDocument(bookPath).promise;
+    const numPages = pdf.numPages;
+    const { width, height } = getPageSize();
+
+    const pageElements = [];
+
+    const cover = document.createElement('div');
+    cover.className = 'page page-cover';
+    cover.setAttribute('data-density', 'hard');
+    cover.innerHTML = `<h2>${bookTitle}</h2><p>tap or click to open</p>`;
+    pageElements.push(cover);
+
+    for (let i = 1; i <= numPages; i++) {
+      const pg = document.createElement('div');
+      pg.className = 'page';
+      pg.dataset.pageNum = i;
+      pageElements.push(pg);
+    }
+
+    const back = document.createElement('div');
+    back.className = 'page page-cover';
+    back.setAttribute('data-density', 'hard');
+    back.innerHTML = `<h2>the end</h2><p><a href="index.html" style="color:#888">&larr; back to library</a></p>`;
+    pageElements.push(back);
+
+    const bookEl = document.getElementById('book');
+    pageElements.forEach(el => bookEl.appendChild(el));
+
+    const pageFlip = new St.PageFlip(bookEl, {
+      width, height,
+      size: 'fixed',
+      minWidth: 200, maxWidth: 1000,
+      minHeight: 300, maxHeight: 1400,
+      showCover: true,
+      mobileScrollSupport: false,
+      usePortrait: width < 500,
+      drawShadow: true,
+      maxShadowOpacity: 0.5,
+      flippingTime: 600
+    });
+
+    pageFlip.loadFromHTML(document.querySelectorAll('.page'));
+    document.getElementById('loading').style.display = 'none';
+    bookEl.classList.add('ready');
+
+    const rendered = new Map();
+    const RENDER_AHEAD = 2;
+
+    async function renderPage(pageNum) {
+      if (rendered.has(pageNum)) return;
+      rendered.set(pageNum, 'loading');
+      try {
+        const page = await pdf.getPage(pageNum);
+        const el = document.querySelector(`.page[data-page-num="${pageNum}"]`);
+        if (!el) return;
+        const viewport = page.getViewport({ scale: 1 });
+        const scale = Math.min(width / viewport.width, height / viewport.height) * 2;
+        const scaledViewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = scaledViewport.width;
+        canvas.height = scaledViewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+        el.innerHTML = '';
+        el.appendChild(canvas);
+        rendered.set(pageNum, 'done');
+      } catch (e) {
+        console.error('Render error page', pageNum, e);
+        rendered.set(pageNum, 'error');
+      }
+    }
+
+    async function renderAround(currentSpread) {
+      const toRender = new Set();
+      for (let offset = -RENDER_AHEAD; offset <= RENDER_AHEAD + 1; offset++) {
+        const flipIdx = currentSpread + offset;
+        if (flipIdx >= 1 && flipIdx <= numPages) toRender.add(flipIdx);
+      }
+      for (const [pageNum, status] of rendered.entries()) {
+        if (!toRender.has(pageNum) && status === 'done') {
+          const el = document.querySelector(`.page[data-page-num="${pageNum}"]`);
+          if (el && Math.abs(pageNum - currentSpread) > RENDER_AHEAD + 3) {
+            el.innerHTML = '';
+            rendered.delete(pageNum);
+          }
+        }
+      }
+      await Promise.all([...toRender].map(renderPage));
+    }
+
+    await renderAround(0);
+
+    pageFlip.on('flip', (e) => {
+      const pageIndex = e.data;
+      renderAround(pageIndex);
+      updatePageInfo(pageIndex, numPages);
+    });
+
+    document.getElementById('prev').addEventListener('click', () => pageFlip.flipPrev());
+    document.getElementById('next').addEventListener('click', () => pageFlip.flipNext());
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') pageFlip.flipPrev();
+      if (e.key === 'ArrowRight') pageFlip.flipNext();
+    });
+
+    updatePageInfo(0, numPages);
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const { width: w, height: h } = getPageSize();
+        pageFlip.update({ width: w, height: h });
+      }, 250);
+    });
+
+  } catch (err) {
+    console.error(err);
+    showError('Could not load book: ' + err.message);
+  }
+}
+
+function updatePageInfo(pageIndex, total) {
+  const info = document.getElementById('page-info');
+  if (pageIndex === 0) info.textContent = 'cover';
+  else if (pageIndex > total) info.textContent = 'end';
+  else info.textContent = `${pageIndex} / ${total}`;
+}
+
+loadBook();
+</script>
+
+</body>
+</html>

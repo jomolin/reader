@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<title>Room 21 Library</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'JetBrains Mono', 'D2Coding', monospace;
+    background: #1a1a1a;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  header {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  header h1 { font-size: 1.5rem; font-weight: 500; margin-bottom: 0.25rem; }
+  header p { color: #888; font-size: 0.9rem; }
+
+  #logout {
+    background: none;
+    border: 1px solid #333;
+    color: #888;
+    padding: 0.4rem 0.8rem;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  #logout:hover { color: #e0e0e0; border-color: #666; }
+
+  .section-title {
+    font-size: 1rem;
+    color: #888;
+    margin: 2rem 0 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .section-title:first-of-type { margin-top: 0; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+  }
+
+  .book {
+    background: #2a2a2a;
+    border: 1px solid #333;
+    border-radius: 2px;
+    padding: 1rem;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    transition: background 0.15s, border-color 0.15s;
+    aspect-ratio: 3 / 4;
+    justify-content: space-between;
+  }
+  .book:hover { background: #333; border-color: #666; }
+
+  .book-title { font-size: 0.95rem; font-weight: 500; line-height: 1.3; }
+  .book-meta { font-size: 0.75rem; color: #888; margin-top: auto; }
+
+  .empty {
+    color: #666;
+    font-size: 0.9rem;
+    font-style: italic;
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+  }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid #333;
+    color: #555;
+    font-size: 0.8rem;
+  }
+
+  #login-screen {
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+  }
+  #login-screen h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  #login-screen p { color: #888; font-size: 0.9rem; margin-bottom: 1rem; }
+
+  #login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 300px;
+  }
+  #login-form input {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 0.75rem;
+    font-family: inherit;
+    font-size: 1rem;
+    border-radius: 2px;
+  }
+  #login-form input:focus { outline: none; border-color: #888; }
+  #login-form button {
+    background: #333;
+    border: 1px solid #555;
+    color: #e0e0e0;
+    padding: 0.75rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  #login-form button:hover { background: #444; border-color: #777; }
+
+  #login-error {
+    color: #c88;
+    font-size: 0.85rem;
+    min-height: 1rem;
+    text-align: center;
+  }
+
+  #library { display: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<div id="login-screen">
+  <h1>Room 21 Library</h1>
+  <p>enter class password</p>
+  <form id="login-form" autocomplete="off">
+    <input type="password" id="password" placeholder="password" autofocus>
+    <button type="submit">enter</button>
+    <div id="login-error"></div>
+  </form>
+</div>
+
+<div id="library">
+  <header>
+    <div>
+      <h1>Room 21 Library</h1>
+      <p>click a book to start reading</p>
+    </div>
+    <button id="logout">lock</button>
+  </header>
+
+  <h2 class="section-title">PDFs</h2>
+  <div class="grid" id="pdf-grid"></div>
+
+  <h2 class="section-title">EPUBs</h2>
+  <div class="grid" id="epub-grid">
+    <p class="empty">no epubs yet</p>
+  </div>
+
+  <footer>
+    <p>all texts used under NZ Ministry of Education educational licensing</p>
+  </footer>
+</div>
+
+</div>
+
+<script>
+// =====================================================================
+// ENCRYPTED BOOK LIST — regenerate with generate-books.py
+// =====================================================================
+const ENCRYPTED_BOOKS = "RIv3u3O1H3hzMt+yobVSKn29naUY2nCjG5SnGVE61P8JPdFFWI7A0XJMwbTJOkQJM4//f2XhtDE4AIKcZ/qwrH8LL2xtj24rfWl5WhFssUCweFAnkdKjMhgHMXNZwO6Al4Sx5oeVn1ygyh3pk/YyYwBNo12U24ZhHiIvpPGESg/UETLH2Eiow7+6DmFmpWgfGvn4rLTAqsABDbEaUaLsF5wBBMfSZc/nzrkKmt4x8xcGos/vMnMeT3HnM+imQSnILkQivQYeNXhxehXVgt0UquY2I9oI1kKHZVLTsp8pjcy+EyzRD4XkYIrmIzrQtNens1rY5U1RVrlseKAQW9UDWubKgsn0k8wJeIN24o3E38p5tRji4ofrY5Fy51ZQBfwG6X8AQXiOzILkBlS8tU6Gfc9V9YgqGoCPhZ6LzEECKfDqaqNza0TTuBuw+D0qXCwRndRpyXNPgfBYONkZoBMkvDg5yyT9fDpKdJZa43UfI5/qzSYhHUiDRx1gsJWO091H3bhOzoy/dxunSmqxaDWYZES6rr3JcSLbxcQsCtqPW1ghgPeNwVsES4/qsg1oK+xlCf4zZIKw7L0JrxYrpBy54fTZAwC5oqO1yWkOlntDlzq/nAKIaQT/+I3/wcv4TWopok6PEdE8WaRwCHQ4mrjUZVlFWZaoIGBjI2CuFXV78N2lXAC2RPN6RfhobRF3xOCr90BXSNuvJjvhayVc0XO1k4v8SZyKWtlShfy5LJnXExkY3PLRTtugwSwfCn/UjXTf0HYTihALe7fjPzZydytwjyjNtjw9q96illRPccVMxYXHWjXU4lDM/VYQKeiJWmjV8Jn+BOyCgJIFykix2xsqxBcnVEthJIKCHpfq0otHB4YLGexmW2I65rSxwH3RIdQvuzHUHPxfYH0aM4WgVK6biGUwyemb0Lo7+qdju92v5O/nJ/YcMHjU8yyWG6YSFXxRlktEFo/Bme7Ht0EKPacsn52Nm0AbmICFYYjIWu1akP3H2dtm202vDycGmfmNxP2IMRzFSNJNeCiyOZOr6jnIWQQS0AgwPbsMpOT9Ejnb3K+p5xf2pEDrlgN5JZ9083BZzS4azfP4pltg4CKdy6YI95nAxnct496o/+3LnSA/OzWDnW4xGjdfD3inpDCYLULRhq+YaiyzKX8WWPb1EMQclriSTxYHb3MpFGUfbPV1RyFScYTEIJQc598fgYlCTSvihIbJzJ5/CiWUBp6Yp0yQal1bdZqbME49pKu3hmoire9+JqDglJ4k3xjtHk9ci/rHJOqySCcCfpS+VXKVuxyQwHc8W9Q5WlD+sEotxERuZZ/iGs/Azek5gprBLUCKdtTLGw3G9OhnSDrV/S72OlNO6d7h7ETQI7kf4sbBJMg2FrELZwy9M+8So6kVs8325tBOmDSCkL2U+ppMB9H2n9Yh8cEu8cr9G/vTpTGopuoqQRF2zj5LeMpATb2dhCzJ/0mMDcCdSeKub/cSMd8NkEmMx1qCedfyRT7t2x2GT6TojKnesMew9VoC1f6emHhwSS0tqXfr+3UA61AHL58BGx0quQ6pfX0uvEH8L4eGQGaxUPgi4+he+csZHYwTDlaeqYsQqAATthNHS6qFOvZpt8AeL067dBm+tyqPWYryN31s/ivh2bPWXX/ZSxe+PIZQhhUcIWs4ETTzUYw0zDEQuJuj0jzxTT4Cko0pcF+4U/LdandR/Ay6IsCM1NKEhd7m7wZ+Xt2vHREgd+t/nHpd/WqHAqRIuHHPqDxveTnVupxu6kPW1nF5wODRg9UrOSlYmtqypSFV1YVZlM2hgxK0XnegMK73NEFlPGBsDOGJspP+fFLy2PRq43RAG4MNBhTaVaAyWwqZlTfeoDVPTN0CRb4bdoxEkOuMjN3b4QCI3v0a8KegeReqE54Tn2ogQQpBU8ABkjFQ1qMY63XXqXnk918aJZg=";
+
+// =====================================================================
+// Web Crypto helpers (AES-GCM + PBKDF2)
+// =====================================================================
+async function deriveKey(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 250000, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"]
+  );
+}
+
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function decryptBooks(password) {
+  const payload = b64ToBytes(ENCRYPTED_BOOKS);
+  const salt = payload.slice(0, 16);
+  const iv = payload.slice(16, 28);
+  const ciphertext = payload.slice(28);
+  const key = await deriveKey(password, salt);
+  const plainBuf = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv }, key, ciphertext
+  );
+  return JSON.parse(new TextDecoder().decode(plainBuf));
+}
+
+// =====================================================================
+// Library rendering
+// =====================================================================
+function renderGrid(gridId, items, type) {
+  const grid = document.getElementById(gridId);
+  if (!items || !items.length) return;
+  grid.innerHTML = '';
+  items.forEach(b => {
+    const a = document.createElement('a');
+    a.className = 'book';
+    const param = type === 'epub' ? 'epub' : 'book';
+    a.href = `reader.html?${param}=${encodeURIComponent(b.file)}&title=${encodeURIComponent(b.title)}`;
+    a.innerHTML = `
+      <div class="book-title">${b.title}</div>
+      <div class="book-meta">${b.meta || ''}</div>
+    `;
+    grid.appendChild(a);
+  });
+}
+
+function showLibrary(books) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('library').style.display = 'block';
+  renderGrid('pdf-grid', books.pdf || [], 'pdf');
+  renderGrid('epub-grid', books.epub || [], 'epub');
+  if (!books.pdf || !books.pdf.length) {
+    document.getElementById('pdf-grid').innerHTML = '<p class="empty">no books yet</p>';
+  }
+  if (!books.epub || !books.epub.length) {
+    document.getElementById('epub-grid').innerHTML = '<p class="empty">no epubs yet</p>';
+  }
+}
+
+// =====================================================================
+// Login flow
+// =====================================================================
+async function tryUnlock(password) {
+  try {
+    const books = await decryptBooks(password);
+    sessionStorage.setItem('room21_pw', password);
+    sessionStorage.setItem('room21_books', JSON.stringify(books));
+    showLibrary(books);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pw = document.getElementById('password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  const ok = await tryUnlock(pw);
+  if (!ok) {
+    errEl.textContent = 'wrong password';
+    document.getElementById('password').value = '';
+    document.getElementById('password').focus();
+  }
+});
+
+document.getElementById('logout').addEventListener('click', () => {
+  sessionStorage.removeItem('room21_pw');
+  sessionStorage.removeItem('room21_books');
+  location.reload();
+});
+
+// Auto-unlock from session
+(async () => {
+  const stored = sessionStorage.getItem('room21_pw');
+  const cachedBooks = sessionStorage.getItem('room21_books');
+  if (stored && cachedBooks) {
+    try {
+      showLibrary(JSON.parse(cachedBooks));
+    } catch {
+      sessionStorage.clear();
+    }
+  }
+})();
+</script>
+
+</body>
+</html>
