@@ -135,18 +135,21 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 const params = new URLSearchParams(window.location.search);
-const bookFile = params.get('book');
-const bookTitle = params.get('title') || (bookFile ? bookFile.replace(/\.[^.]+$/, '') : 'Book');
+// New-style: ?path=<full relative path>&type=pdf|epub
+// Legacy:    ?book=<file under books/>  (still accepted)
+const rawPath = params.get('path') || (params.get('book') ? `books/${params.get('book')}` : null);
+const bookType = params.get('type') || 'pdf';
+const bookTitle = params.get('title') || (rawPath ? rawPath.split('/').pop().replace(/\.[^.]+$/, '') : 'Book');
 
 document.getElementById('book-title').textContent = bookTitle;
 document.title = bookTitle + ' - Reader';
 
-if (!bookFile) {
+if (!rawPath) {
   showError('No book specified.');
   throw new Error('No book');
 }
 
-const bookPath = bookFile.startsWith('http') ? bookFile : `books/${bookFile}`;
+const bookPath = rawPath;
 
 function showError(msg) {
   document.getElementById('loading').style.display = 'none';

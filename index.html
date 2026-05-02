@@ -25,12 +25,32 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
+    gap: 1rem;
+    flex-wrap: wrap;
   }
 
   header h1 { font-size: 1.5rem; font-weight: 500; margin-bottom: 0.25rem; }
   header p { color: #888; font-size: 0.9rem; }
 
-  #logout {
+  .header-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  #collection-select {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 0.4rem 0.6rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  #collection-select:focus { outline: none; border-color: #888; }
+
+  .btn-secondary {
     background: none;
     border: 1px solid #333;
     color: #888;
@@ -39,17 +59,9 @@
     font-size: 0.8rem;
     cursor: pointer;
     border-radius: 2px;
+    text-decoration: none;
   }
-  #logout:hover { color: #e0e0e0; border-color: #666; }
-
-  .section-title {
-    font-size: 1rem;
-    color: #888;
-    margin: 2rem 0 1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-  .section-title:first-of-type { margin-top: 0; }
+  .btn-secondary:hover { color: #e0e0e0; border-color: #666; }
 
   .grid {
     display: grid;
@@ -92,16 +104,16 @@
     font-size: 0.8rem;
   }
 
-  #login-screen {
-    min-height: 80vh;
+  #login-screen, #chooser-screen {
+    min-height: 70vh;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     gap: 1rem;
   }
-  #login-screen h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-  #login-screen p { color: #888; font-size: 0.9rem; margin-bottom: 1rem; }
+  #login-screen h1, #chooser-screen h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  #login-screen p, #chooser-screen p { color: #888; font-size: 0.9rem; margin-bottom: 1rem; }
 
   #login-form {
     display: flex;
@@ -139,7 +151,36 @@
     text-align: center;
   }
 
+  #chooser-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    width: 100%;
+    max-width: 700px;
+  }
+  .collection-btn {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 1.5rem 1rem;
+    font-family: inherit;
+    font-size: 1rem;
+    cursor: pointer;
+    border-radius: 2px;
+    text-align: left;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .collection-btn:hover:not(:disabled) { background: #333; border-color: #777; }
+  .collection-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .collection-btn .col-name { font-size: 1.05rem; font-weight: 500; }
+  .collection-btn .col-meta { font-size: 0.8rem; color: #888; margin-top: 0.4rem; }
+
+  #chooser-actions {
+    margin-top: 1rem;
+  }
+
   #library { display: none; }
+  #chooser-screen { display: none; }
 </style>
 </head>
 <body>
@@ -156,22 +197,29 @@
   </form>
 </div>
 
+<div id="chooser-screen">
+  <h1>BSLA Library</h1>
+  <p>choose a collection</p>
+  <div id="chooser-buttons"></div>
+  <div id="chooser-actions">
+    <button id="chooser-logout" class="btn-secondary">lock</button>
+  </div>
+</div>
+
 <div id="library">
   <header>
     <div>
-      <h1>BSLA Library</h1>
+      <h1 id="library-title">Library</h1>
       <p>click a book to start reading</p>
     </div>
-    <button id="logout">lock</button>
+    <div class="header-actions">
+      <select id="collection-select"></select>
+      <button id="back-to-chooser" class="btn-secondary">collections</button>
+      <button id="logout" class="btn-secondary">lock</button>
+    </div>
   </header>
 
-  <h2 class="section-title">PDFs</h2>
-  <div class="grid" id="pdf-grid"></div>
-
-  <h2 class="section-title">EPUBs</h2>
-  <div class="grid" id="epub-grid">
-    <p class="empty">no epubs yet</p>
-  </div>
+  <div class="grid" id="book-grid"></div>
 
   <footer>
     <p>all texts used under NZ Ministry of Education educational licensing</p>
@@ -184,7 +232,7 @@
 // =====================================================================
 // ENCRYPTED BOOK LIST — regenerate with generate-books.py
 // =====================================================================
-const ENCRYPTED_BOOKS = "RIv3u3O1H3hzMt+yobVSKn29naUY2nCjG5SnGVE61P8JPdFFWI7A0XJMwbTJOkQJM4//f2XhtDE4AIKcZ/qwrH8LL2xtj24rfWl5WhFssUCweFAnkdKjMhgHMXNZwO6Al4Sx5oeVn1ygyh3pk/YyYwBNo12U24ZhHiIvpPGESg/UETLH2Eiow7+6DmFmpWgfGvn4rLTAqsABDbEaUaLsF5wBBMfSZc/nzrkKmt4x8xcGos/vMnMeT3HnM+imQSnILkQivQYeNXhxehXVgt0UquY2I9oI1kKHZVLTsp8pjcy+EyzRD4XkYIrmIzrQtNens1rY5U1RVrlseKAQW9UDWubKgsn0k8wJeIN24o3E38p5tRji4ofrY5Fy51ZQBfwG6X8AQXiOzILkBlS8tU6Gfc9V9YgqGoCPhZ6LzEECKfDqaqNza0TTuBuw+D0qXCwRndRpyXNPgfBYONkZoBMkvDg5yyT9fDpKdJZa43UfI5/qzSYhHUiDRx1gsJWO091H3bhOzoy/dxunSmqxaDWYZES6rr3JcSLbxcQsCtqPW1ghgPeNwVsES4/qsg1oK+xlCf4zZIKw7L0JrxYrpBy54fTZAwC5oqO1yWkOlntDlzq/nAKIaQT/+I3/wcv4TWopok6PEdE8WaRwCHQ4mrjUZVlFWZaoIGBjI2CuFXV78N2lXAC2RPN6RfhobRF3xOCr90BXSNuvJjvhayVc0XO1k4v8SZyKWtlShfy5LJnXExkY3PLRTtugwSwfCn/UjXTf0HYTihALe7fjPzZydytwjyjNtjw9q96illRPccVMxYXHWjXU4lDM/VYQKeiJWmjV8Jn+BOyCgJIFykix2xsqxBcnVEthJIKCHpfq0otHB4YLGexmW2I65rSxwH3RIdQvuzHUHPxfYH0aM4WgVK6biGUwyemb0Lo7+qdju92v5O/nJ/YcMHjU8yyWG6YSFXxRlktEFo/Bme7Ht0EKPacsn52Nm0AbmICFYYjIWu1akP3H2dtm202vDycGmfmNxP2IMRzFSNJNeCiyOZOr6jnIWQQS0AgwPbsMpOT9Ejnb3K+p5xf2pEDrlgN5JZ9083BZzS4azfP4pltg4CKdy6YI95nAxnct496o/+3LnSA/OzWDnW4xGjdfD3inpDCYLULRhq+YaiyzKX8WWPb1EMQclriSTxYHb3MpFGUfbPV1RyFScYTEIJQc598fgYlCTSvihIbJzJ5/CiWUBp6Yp0yQal1bdZqbME49pKu3hmoire9+JqDglJ4k3xjtHk9ci/rHJOqySCcCfpS+VXKVuxyQwHc8W9Q5WlD+sEotxERuZZ/iGs/Azek5gprBLUCKdtTLGw3G9OhnSDrV/S72OlNO6d7h7ETQI7kf4sbBJMg2FrELZwy9M+8So6kVs8325tBOmDSCkL2U+ppMB9H2n9Yh8cEu8cr9G/vTpTGopuoqQRF2zj5LeMpATb2dhCzJ/0mMDcCdSeKub/cSMd8NkEmMx1qCedfyRT7t2x2GT6TojKnesMew9VoC1f6emHhwSS0tqXfr+3UA61AHL58BGx0quQ6pfX0uvEH8L4eGQGaxUPgi4+he+csZHYwTDlaeqYsQqAATthNHS6qFOvZpt8AeL067dBm+tyqPWYryN31s/ivh2bPWXX/ZSxe+PIZQhhUcIWs4ETTzUYw0zDEQuJuj0jzxTT4Cko0pcF+4U/LdandR/Ay6IsCM1NKEhd7m7wZ+Xt2vHREgd+t/nHpd/WqHAqRIuHHPqDxveTnVupxu6kPW1nF5wODRg9UrOSlYmtqypSFV1YVZlM2hgxK0XnegMK73NEFlPGBsDOGJspP+fFLy2PRq43RAG4MNBhTaVaAyWwqZlTfeoDVPTN0CRb4bdoxEkOuMjN3b4QCI3v0a8KegeReqE54Tn2ogQQpBU8ABkjFQ1qMY63XXqXnk918aJZg=";
+const ENCRYPTED_BOOKS = "i4tCdC/eCOWcITPchSFWo0sa9VKUo8+0QQxnoCCh5WcvO75aW3lNKndhbW5XoiU2t1AsQHGlqBPGNw7LG+sqmuMAq23pRdwc7Tk3skTBNFlr8AyKExiXZbsUPF5KYXCG/Br7/W0TcdsBE33gPt1Ny3AtUZDLoR3JHBoi2m5JhmKar20YfAoSOGSEZIxPF3Wa5cKILai/Qi4zfnzDSGjgc5wKgBVwa3llcYHv5epaSOE1hRNYSSUAuugm3fzyoXXb+TM6nDduAqmO7U4/OHQJo5WhdUf8rMHwfCgBznci+ge+VIw4Kz5VjvYKTXzsPDYLKwuo3zibAcOBgAgzIQnaGfCKb8rxkDGbdHZAkV5OOawv3UTIB250AGImWgXcvZoibX9byMabGEVSjFyxkvc0prDT0TIkgc+QH1mXs3JUMoahOlG+lJpqqCx75A/U2zoQKJdm+ld+DziuDrkd3AilwjEa0U5blsTgsTztLT0fwPIZQw4fspK+Vu5cMJyJ+21LenO0apJ2vxsaMxehOWHCsLPR/BGTDPPyWG2NzdxG+ZVLsTg+Kx9ny4gaV51+b5NiLg7a5znbeKK1RW4yzKl9DmWLr+zeBs/T1Gg5D1x0wM3Xj6ucIm2WO2pw6ZgOeju+ocP4dWhJVDGDaaVk8ioBInU9TQQpfSPBjUDDu2cJQOOM4xLP6r86C2I83AtSZ27Z7ApiuXumzqTrzIch8/Xp9Y5gjmVMBxNArAXez7cOippiA/8SbFaP1ArljpRw6aUAl6YfOalPuyzKcTPk2RUKNnrsdDFGHWqJMcOVCUCbSybmBbeLCH5KLOR5lDUZPPW5S906mmj38cdmFNWBsRFHk6swUvGjkHyenlmjwFGlrJAzHSZvXslOOsF7UEGqkQ4svkmw/vyKvTK0rszhqZOZR3GoETMnlNhgaE8X8WbJTmg6u+Qlh/4sf7t+9OpnSyRa5KrE/CwXQ02ScVz5AyVCXHMKDO0xC4Nmb8e4i3FvgY+vLxiG8HBnac/6zulanKA9EXl3ImbLR7GJPjh4ovX3LrxcLm+iRbY2vuBu78rMv4LnDYAmGDF8OmHfqzwZmTJREEv1xH/a5BLniX0GgBU7oEwgNExiYvXOhg5W2QhM4J/5rmh+FIsNseZa+Uj/OrhfqQ9LEIvnqhn+iv4Fgu4RSeMAvk5asgQOUt7xz2F89oYvoMYO0XlFXH2x+icgoCEt7dr83hkurhfBoLUGjd/Ervx9Oyeb66MuoG0tPdi+kEUTtM3YNKugkW8t8puu7bDcB9AvLP1+FTmUXfuanpTbT5fHiisRzujpR10eyn24WDjWQIWIUPFKrx40pE+oz+j3ir3I63YduaprhSSyVW6pNs7SivXE4BTcaIiaUiRbc0O5n6+3lI8lD2bCGisPW0Rm0XJTs5IuB1EQYKhFwi1tN1QMvml11jrm+c5AwohImTeO9PbGUCDxakx+ZdMdk3NSh+OiFVZ8HWzeg5mV84n1GMZDUdnHkbyQMGBHTiWlMr8f296TVJMppEDrCfKIW84YnyLOAbJfUe53BZTENBEGcuyp4LR8WwK3ikBjNWWPQ0AZZQ/GSdVcxpGcjtuWPqrRDdxZqzBlZBky9GQR/SyFW2S5I6/IePRkX8V9uiih6RjTdoY/A/1YAPwUKhlZhvBgTpnB/8osyxiwEBuqhraJStLl5appLA1yiXVzHj+4X2dAIescIiErnD/hx7sD3XQmV4i951q2pMoDyXsjZMP4PlIkNPq3stBMBBpgR2qRbH2TdXB2tJ6/L+7m+W9duxvsMETuVi7I3ahZycCnwtkmzXRwHkleJbT9nGF4b3DB9w8bMbZnD4pWCP9BuhGRkd6LRImpRA==";
 
 // =====================================================================
 // Web Crypto helpers (AES-GCM + PBKDF2)
@@ -210,7 +258,7 @@ function b64ToBytes(b64) {
   return bytes;
 }
 
-async function decryptBooks(password) {
+async function decryptCollections(password) {
   const payload = b64ToBytes(ENCRYPTED_BOOKS);
   const salt = payload.slice(0, 16);
   const iv = payload.slice(16, 28);
@@ -223,17 +271,56 @@ async function decryptBooks(password) {
 }
 
 // =====================================================================
-// Library rendering
+// Views
 // =====================================================================
-function renderGrid(gridId, items, type) {
-  const grid = document.getElementById(gridId);
-  if (!items || !items.length) return;
+let COLLECTIONS = null;
+
+function showOnly(id) {
+  for (const v of ['login-screen', 'chooser-screen', 'library']) {
+    document.getElementById(v).style.display = (v === id) ? (v === 'library' ? 'block' : 'flex') : 'none';
+  }
+}
+
+function renderChooser() {
+  const wrap = document.getElementById('chooser-buttons');
+  wrap.innerHTML = '';
+  for (const [id, col] of Object.entries(COLLECTIONS)) {
+    const count = (col.items || []).length;
+    const btn = document.createElement('button');
+    btn.className = 'collection-btn';
+    btn.disabled = count === 0;
+    btn.innerHTML = `
+      <div class="col-name">${col.name}</div>
+      <div class="col-meta">${count} ${col.type}${count === 1 ? '' : 's'}${count === 0 ? ' — coming soon' : ''}</div>
+    `;
+    btn.addEventListener('click', () => openLibrary(id));
+    wrap.appendChild(btn);
+  }
+  showOnly('chooser-screen');
+}
+
+function renderCollectionGrid(id) {
+  const col = COLLECTIONS[id];
+  const grid = document.getElementById('book-grid');
   grid.innerHTML = '';
+  document.getElementById('library-title').textContent = col.name;
+
+  const items = col.items || [];
+  if (!items.length) {
+    grid.innerHTML = `<p class="empty">no ${col.type}s yet</p>`;
+    return;
+  }
   items.forEach(b => {
     const a = document.createElement('a');
     a.className = 'book';
-    const param = type === 'epub' ? 'epub' : 'book';
-    a.href = `reader.html?${param}=${encodeURIComponent(b.file)}&title=${encodeURIComponent(b.title)}`;
+    const path = `${col.folder}/${b.file}`;
+    const qs = new URLSearchParams({
+      path,
+      type: col.type,
+      title: b.title,
+      collection: id,
+    });
+    a.href = `reader.html?${qs.toString()}`;
     a.innerHTML = `
       <div class="book-title">${b.title}</div>
       <div class="book-meta">${b.meta || ''}</div>
@@ -242,17 +329,22 @@ function renderGrid(gridId, items, type) {
   });
 }
 
-function showLibrary(books) {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('library').style.display = 'block';
-  renderGrid('pdf-grid', books.pdf || [], 'pdf');
-  renderGrid('epub-grid', books.epub || [], 'epub');
-  if (!books.pdf || !books.pdf.length) {
-    document.getElementById('pdf-grid').innerHTML = '<p class="empty">no books yet</p>';
+function openLibrary(id) {
+  if (!COLLECTIONS[id]) return;
+  sessionStorage.setItem('room21_collection', id);
+
+  const select = document.getElementById('collection-select');
+  select.innerHTML = '';
+  for (const [cid, col] of Object.entries(COLLECTIONS)) {
+    const opt = document.createElement('option');
+    opt.value = cid;
+    opt.textContent = col.name;
+    if (cid === id) opt.selected = true;
+    select.appendChild(opt);
   }
-  if (!books.epub || !books.epub.length) {
-    document.getElementById('epub-grid').innerHTML = '<p class="empty">no epubs yet</p>';
-  }
+
+  renderCollectionGrid(id);
+  showOnly('library');
 }
 
 // =====================================================================
@@ -260,10 +352,11 @@ function showLibrary(books) {
 // =====================================================================
 async function tryUnlock(password) {
   try {
-    const books = await decryptBooks(password);
+    const cols = await decryptCollections(password);
     sessionStorage.setItem('room21_pw', password);
-    sessionStorage.setItem('room21_books', JSON.stringify(books));
-    showLibrary(books);
+    sessionStorage.setItem('room21_collections', JSON.stringify(cols));
+    COLLECTIONS = cols;
+    renderChooser();
     return true;
   } catch (e) {
     return false;
@@ -283,19 +376,38 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   }
 });
 
-document.getElementById('logout').addEventListener('click', () => {
+function logout() {
   sessionStorage.removeItem('room21_pw');
-  sessionStorage.removeItem('room21_books');
+  sessionStorage.removeItem('room21_collections');
+  sessionStorage.removeItem('room21_collection');
   location.reload();
+}
+
+document.getElementById('logout').addEventListener('click', logout);
+document.getElementById('chooser-logout').addEventListener('click', logout);
+
+document.getElementById('back-to-chooser').addEventListener('click', () => {
+  sessionStorage.removeItem('room21_collection');
+  renderChooser();
+});
+
+document.getElementById('collection-select').addEventListener('change', (e) => {
+  openLibrary(e.target.value);
 });
 
 // Auto-unlock from session
 (async () => {
   const stored = sessionStorage.getItem('room21_pw');
-  const cachedBooks = sessionStorage.getItem('room21_books');
-  if (stored && cachedBooks) {
+  const cached = sessionStorage.getItem('room21_collections');
+  if (stored && cached) {
     try {
-      showLibrary(JSON.parse(cachedBooks));
+      COLLECTIONS = JSON.parse(cached);
+      const lastCol = sessionStorage.getItem('room21_collection');
+      if (lastCol && COLLECTIONS[lastCol]) {
+        openLibrary(lastCol);
+      } else {
+        renderChooser();
+      }
     } catch {
       sessionStorage.clear();
     }
