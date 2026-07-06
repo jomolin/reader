@@ -540,18 +540,27 @@ async function loadPdf() {
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
-  function getPageSize() {
+  // page-flip's `autoSize` (on by default) stretches the book to 100% of
+  // the container's width no matter what width/height we configure, and
+  // derives the on-screen height purely from the height/width *ratio* of
+  // those settings. So pageAspect must match the PDF's real page shape —
+  // a wrong ratio (e.g. assuming portrait for a landscape scan) gets
+  // multiplied by the full container width and blows up the page height.
+  function getPageSize(pageAspect) {
     const container = document.getElementById('book-container');
     const availW = container.clientWidth - 32;
     const availH = container.clientHeight - 32;
-    const pageAspect = 3 / 4;
     let pageH = availH;
     let pageW = pageH * pageAspect;
+    if (pageW > availW) {
+      pageW = availW;
+      pageH = pageW / pageAspect;
+    }
     if (forceSinglePage) {
       // Keep the configured page width above half the available width so
       // page-flip's own portrait-mode check (container < 2 * pageWidth)
       // always trips, forcing a single page per spread instead of two.
-      pageW = Math.min(availW, Math.max(pageW, availW / 2 + 1));
+      if (pageW * 2 <= availW) pageW = availW / 2 + 1;
     } else if (pageW * 2 > availW) {
       pageW = availW / 2;
       pageH = pageW / pageAspect;
@@ -562,7 +571,10 @@ async function loadPdf() {
   try {
     const pdf = await pdfjsLib.getDocument(rawPath).promise;
     const numPages = pdf.numPages;
-    const { width, height } = getPageSize();
+    const firstPage = await pdf.getPage(1);
+    const firstViewport = firstPage.getViewport({ scale: 1 });
+    const pageAspect = firstViewport.width / firstViewport.height;
+    const { width, height } = getPageSize(pageAspect);
 
     const pageElements = [];
 
@@ -591,9 +603,15 @@ async function loadPdf() {
     const pageFlip = new St.PageFlip(bookEl, {
       width, height,
       size: 'fixed',
-      minWidth: 200, maxWidth: forceSinglePage ? 2000 : 1000,
+      minWidth: 200, maxWidth: 1000,
       minHeight: 300, maxHeight: 1400,
       showCover: true,
+      // We already recompute width/height ourselves on window resize below;
+      // page-flip's autoSize stretches the book to 100% of the container's
+      // width and derives height from the width/height *ratio*, which blows
+      // up the page height whenever a page's real aspect ratio differs from
+      // the container's — very visible on landscape-shaped single pages.
+      autoSize: false,
       mobileScrollSupport: false,
       usePortrait: forceSinglePage || width < 500,
       drawShadow: true,
@@ -672,7 +690,7 @@ async function loadPdf() {
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        const { width: w, height: h } = getPageSize();
+        const { width: w, height: h } = getPageSize(pageAspect);
         pageFlip.update({ width: w, height: h });
       }, 250);
     });
