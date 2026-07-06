@@ -258,6 +258,7 @@ const params = new URLSearchParams(window.location.search);
 const rawPath = params.get('path') || (params.get('book') ? `books/${params.get('book')}` : null);
 const bookType = params.get('type') || 'pdf';
 const bookTitle = params.get('title') || (rawPath ? rawPath.split('/').pop().replace(/\.[^.]+$/, '') : 'Book');
+const forceSinglePage = params.get('single') === '1';
 
 document.getElementById('book-title').textContent = bookTitle;
 document.title = bookTitle + ' - Reader';
@@ -546,7 +547,12 @@ async function loadPdf() {
     const pageAspect = 3 / 4;
     let pageH = availH;
     let pageW = pageH * pageAspect;
-    if (pageW * 2 > availW) {
+    if (forceSinglePage) {
+      // Keep the configured page width above half the available width so
+      // page-flip's own portrait-mode check (container < 2 * pageWidth)
+      // always trips, forcing a single page per spread instead of two.
+      pageW = Math.min(availW, Math.max(pageW, availW / 2 + 1));
+    } else if (pageW * 2 > availW) {
       pageW = availW / 2;
       pageH = pageW / pageAspect;
     }
@@ -585,11 +591,11 @@ async function loadPdf() {
     const pageFlip = new St.PageFlip(bookEl, {
       width, height,
       size: 'fixed',
-      minWidth: 200, maxWidth: 1000,
+      minWidth: 200, maxWidth: forceSinglePage ? 2000 : 1000,
       minHeight: 300, maxHeight: 1400,
       showCover: true,
       mobileScrollSupport: false,
-      usePortrait: width < 500,
+      usePortrait: forceSinglePage || width < 500,
       drawShadow: true,
       maxShadowOpacity: 0.5,
       flippingTime: 600
